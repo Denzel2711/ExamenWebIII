@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Referencias a los elementos del formulario y botones
     const form = document.getElementById("formPelicula");
     const tabla = document.getElementById("tablaPeliculas").querySelector("tbody");
     const btnAgregar = document.getElementById("btnAgregarPelicula");
@@ -7,34 +8,74 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnLimpiar = document.getElementById("btnLimpiarPelicula");
     const filtro = document.getElementById("filtroPeliculas");
 
-    const baseUrl = "http://localhost/examenwebiii/controller/api_peliculas.php";
-    const cedula = "12345678"; // Reemplazar con la cédula real
-    const clave = "clave_secreta"; // Reemplazar con la clave correspondiente
+    // URL base de la API y credenciales de prueba
+    const baseUrl = "http://localhost/ExamenWebIII/controller/api_peliculas.php";
+    const cedula = "504360028"; // Cédula quemada para pruebas
+    const clave = "A9f$6kL2@vX8#mN7%wQ4&rS5^bT1!jD3"; // Clave original
+
+    let peliculas = []; // Declarar como variable global para el filtro dinámico
 
     // Cifrar datos con AES
     const cifrarDatos = (datos) => {
-        const jsonString = JSON.stringify(datos);
-        const encrypted = CryptoJS.AES.encrypt(jsonString, clave).toString();
-        return btoa(encrypted);
+        const jsonString = JSON.stringify(datos); // Convertir a JSON string
+        const key = CryptoJS.enc.Utf8.parse(clave);
+        const encrypted = CryptoJS.AES.encrypt(jsonString, key, {
+            mode: CryptoJS.mode.ECB, // Modo ECB
+            padding: CryptoJS.pad.Pkcs7, 
+        });
+        return encrypted.toString(); // Retorna el texto cifrado
     };
 
     // Desencriptar datos con AES
     const desencriptarDatos = (datosCifrados) => {
-        const decoded = atob(datosCifrados);
-        const decrypted = CryptoJS.AES.decrypt(decoded, clave);
-        const jsonString = decrypted.toString(CryptoJS.enc.Utf8);
-        return JSON.parse(jsonString);
+        try {
+            const key = CryptoJS.enc.Utf8.parse(clave);
+            const decrypted = CryptoJS.AES.decrypt(datosCifrados, key, {
+                mode: CryptoJS.mode.ECB,
+                padding: CryptoJS.pad.Pkcs7,
+            });
+            const jsonString = decrypted.toString(CryptoJS.enc.Utf8);
+
+            if (!jsonString) {
+                throw new Error("Desencriptación fallida");
+            }
+
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error("Error al desencriptar los datos:", e);
+            return null;
+        }
     };
 
     // Listar películas
     const listarPeliculas = async () => {
-        const response = await fetch(baseUrl, { 
-            method: "GET", 
-            headers: { "Cedula": cedula } 
-        });
-        const datosCifrados = await response.text();
-        peliculas = desencriptarDatos(datosCifrados);
-        mostrarPeliculas(peliculas);
+        try {
+            const response = await fetch(baseUrl, {
+                method: "GET",
+                headers: { "X-Cedula": cedula },
+            });
+
+            const responseText = await response.text();
+
+            console.log("Estado de la respuesta:", response.status);
+            console.log("Texto de la respuesta:", responseText);
+
+            if (!response.ok) {
+                console.error("Error en la respuesta del servidor:", responseText);
+                throw new Error("Error al obtener las películas");
+            }
+
+            peliculas = desencriptarDatos(responseText);
+
+            if (!peliculas) {
+                throw new Error("Error al desencriptar los datos");
+            }
+
+            mostrarPeliculas(peliculas);
+        } catch (error) {
+            console.error("Error:", error.message);
+            alert("No se pudo obtener la lista de películas.");
+        }
     };
 
     // Mostrar películas en la tabla
@@ -42,18 +83,17 @@ document.addEventListener("DOMContentLoaded", () => {
         tabla.innerHTML = peliculasFiltradas
             .map(
                 (p) => `
-            <tr data-id="${p.Id}">
-                <td>${p.Titulo}</td>
-                <td>${p.Genero}</td>
-                <td>${p.Duracion}</td>
-            </tr>
-        `
+                <tr data-id="${p.Id}">
+                    <td>${p.Titulo}</td>
+                    <td>${p.Genero}</td>
+                    <td>${p.Duracion}</td>
+                </tr>`
             )
             .join("");
         agregarEventosTabla();
     };
 
-    // Filtrar películas dinámicamente
+    // Filtrar películas en tiempo real
     filtro.addEventListener("input", () => {
         const texto = filtro.value.toLowerCase();
         const peliculasFiltradas = peliculas.filter(
@@ -65,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
         mostrarPeliculas(peliculasFiltradas);
     });
 
-    // Función para agregar eventos a las filas de la tabla
+    // Agregar eventos a las filas de la tabla
     const agregarEventosTabla = () => {
         const filas = tabla.querySelectorAll("tr");
         filas.forEach((fila) => {
@@ -90,23 +130,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Agregar película
     btnAgregar.addEventListener("click", async () => {
+        if (!form.PeliculaTitulo.value || !form.PeliculaGenero.value || !form.PeliculaDuracion.value) {
+            alert("Todos los campos son obligatorios.");
+            return;
+        }
+
         const data = {
             Titulo: form.PeliculaTitulo.value,
             Genero: form.PeliculaGenero.value,
             Duracion: form.PeliculaDuracion.value,
         };
         const bodyCifrado = cifrarDatos(data);
-        await fetch(baseUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Cedula": cedula },
-            body: bodyCifrado,
-        });
-        form.reset();
-        listarPeliculas();
+        try {
+            const response = await fetch(baseUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Cedula": cedula },
+                body: bodyCifrado,
+            });
+
+            const responseText = await response.text();
+
+            if (!response.ok) {
+                console.error("Error en la respuesta del servidor:", responseText);
+                throw new Error("Error al agregar la película");
+            }
+
+            form.reset();
+            listarPeliculas();
+        } catch (error) {
+            console.error("Error:", error.message);
+            alert("No se pudo agregar la película.");
+        }
     });
 
     // Editar película
     btnEditar.addEventListener("click", async () => {
+        if (!form.PeliculaId.value) {
+            alert("Debes seleccionar una película para editar.");
+            return;
+        }
+
         const data = {
             Id: form.PeliculaId.value,
             Titulo: form.PeliculaTitulo.value,
@@ -114,34 +177,65 @@ document.addEventListener("DOMContentLoaded", () => {
             Duracion: form.PeliculaDuracion.value,
         };
         const bodyCifrado = cifrarDatos(data);
-        await fetch(baseUrl, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json", "Cedula": cedula },
-            body: bodyCifrado,
-        });
-        form.reset();
-        btnEditar.disabled = true;
-        btnEliminar.disabled = true;
-        btnAgregar.disabled = false;
-        listarPeliculas();
-    });
-
-    // Eliminar película
-    btnEliminar.addEventListener("click", async () => {
-        const confirmar = confirm("¿Estás seguro de que deseas eliminar esta película?");
-        if (confirmar) {
-            const data = { Id: form.PeliculaId.value };
-            const bodyCifrado = cifrarDatos(data);
-            await fetch(baseUrl, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json", "Cedula": cedula },
+        try {
+            const response = await fetch(baseUrl, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "X-Cedula": cedula },
                 body: bodyCifrado,
             });
+
+            const responseText = await response.text();
+
+            if (!response.ok) {
+                console.error("Error en la respuesta del servidor:", responseText);
+                throw new Error("Error al editar la película");
+            }
+
             form.reset();
             btnEditar.disabled = true;
             btnEliminar.disabled = true;
             btnAgregar.disabled = false;
             listarPeliculas();
+        } catch (error) {
+            console.error("Error:", error.message);
+            alert("No se pudo editar la película.");
+        }
+    });
+
+    // Eliminar película
+    btnEliminar.addEventListener("click", async () => {
+        if (!form.PeliculaId.value) {
+            alert("Debes seleccionar una película para eliminar.");
+            return;
+        }
+
+        const confirmar = confirm("¿Estás seguro de que deseas eliminar esta película?");
+        if (confirmar) {
+            const data = { Id: form.PeliculaId.value };
+            const bodyCifrado = cifrarDatos(data);
+            try {
+                const response = await fetch(baseUrl, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json", "X-Cedula": cedula },
+                    body: bodyCifrado,
+                });
+
+                const responseText = await response.text();
+
+                if (!response.ok) {
+                    console.error("Error en la respuesta del servidor:", responseText);
+                    throw new Error("Error al eliminar la película");
+                }
+
+                form.reset();
+                btnEditar.disabled = true;
+                btnEliminar.disabled = true;
+                btnAgregar.disabled = false;
+                listarPeliculas();
+            } catch (error) {
+                console.error("Error:", error.message);
+                alert("No se pudo eliminar la película.");
+            }
         }
     });
 
@@ -154,6 +248,6 @@ document.addEventListener("DOMContentLoaded", () => {
         tabla.querySelectorAll("tr").forEach((f) => f.classList.remove("selected"));
     });
 
-    // Inicialización
+    // Listar películas al cargar la página
     listarPeliculas();
 });

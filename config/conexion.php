@@ -13,7 +13,6 @@ class Conectar
 
             $this->conexion_bd = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
             $this->conexion_bd->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
             return $this->conexion_bd;
         } catch (PDOException $e) {
             die("Error en la base de datos: " . $e->getMessage());
