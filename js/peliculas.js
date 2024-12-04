@@ -10,8 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // URL base de la API y credenciales de prueba
     const baseUrl = "http://localhost/ExamenWebIII/controller/api_peliculas.php";
-    const cedula = "504360028"; // Cédula quemada para pruebas
-    const clave = "A9f$6kL2@vX8#mN7%wQ4&rS5^bT1!jD3"; // Clave original
+    const cedula = "504360028";
+    const clave = "nr5e67n4567m4768678m584n56n47n67";
 
     let peliculas = []; // Declarar como variable global para el filtro dinámico
 
@@ -56,9 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const responseText = await response.text();
-
-            console.log("Estado de la respuesta:", response.status);
-            console.log("Texto de la respuesta:", responseText);
 
             if (!response.ok) {
                 console.error("Error en la respuesta del servidor:", responseText);
